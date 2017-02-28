@@ -1,6 +1,6 @@
 = Extremely fast builds with Gradle 3
 Cédric Champeau (@CedricChampeau), Gradle
-2016-04-22
+2017-02-28
 :revnumber: {project-version}
 :example-caption!:
 ifndef::imagesdir[:imagesdir: images]
@@ -36,10 +36,10 @@ speaker {
     company 'Gradle Inc'
     oss 'Apache Groovy committer',
     successes 'Static type checker',
-                    'Static compilation',
-                    'Traits',
-                    'Markup template engine',
-                    'DSLs'
+              'Static compilation',
+              'Traits',
+              'Markup template engine',
+              'DSLs'
         failures Stream.of(bugs),
         twitter '@CedricChampeau',
         github 'melix',
@@ -57,6 +57,8 @@ Misc OSS contribs (Gradle plugins, deck2pdf, jlangdetect, ...)'''
 * Continuous builds
 * Composite builds
 * Build cache
+
+== Gradle != Android
 
 == What is Gradle?
 
@@ -105,9 +107,10 @@ image::daemon-keynote-warm.gif[]
 
 == Build scan demo
 
-https://scans.gradle.com/s/sample/groovy
+https://scans.gradle.com/s/cmihj7rsqszle
 https://scans.gradle.com/s/cxwz7amaxhcdc
 https://scans.gradle.com/s/ly5tnqtuoqlwe
+https://scans.gradle.com/s/7ftlptyifoqna (Android)
 
 == Creating a build scan
 
@@ -116,7 +119,7 @@ https://scans.gradle.com/s/ly5tnqtuoqlwe
 [source,groovy]
 ----
 plugins {
-    id 'com.gradle.build-scan' version '1.3'
+    id 'com.gradle.build-scan' version '1.6'
 }
 
 buildScan {
@@ -128,7 +131,7 @@ buildScan {
 === Run the build
 
 ```
-./gradlew -Dscan build
+./gradlew --scan build
 ```
 
 === Click on the link
@@ -202,6 +205,12 @@ compileJava {
 }
 ```
 
+image::gradle-3.4-perf.png[]
+
+== Gradle 3.4
+
+https://blog.gradle.org/incremental-compiler-avoidance
+
 == Continuous builds
 
 * Gradle watches for changes in task inputs
@@ -211,6 +220,68 @@ compileJava {
 ```
 gradle -t asciidoctor
 ```
+
+== Compile avoidance
+
+=== Compile classpath vs runtime classpath
+
+* Gradle makes the difference
+* Ignores irrelevant (non ABI) changes to compile classpath
+
+=== Usage
+
+[source,java]
+----
+import com.acme.model.Person;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+
+...
+
+public Set<String> getNames(Set<Foo> persons) {
+   return ImmutableSet.copyOf(Iterables.transform(persons, TO_NAME))
+}
+----
+
+=== Declaring dependencies
+
+[source,groovy]
+----
+dependencies {
+   compile project(':model')
+   compile 'com.google.guava:guava:18.0'
+}
+----
+
+=== But...
+
+[source,java]
+----
+import com.acme.model.Person; // exported dependency
+import com.google.common.collect.ImmutableSet; // internal dependency
+import com.google.common.collect.Iterables; // internal dependency
+
+...
+
+public Set<String> getNames(Set<Foo> persons) {
+   return ImmutableSet.copyOf(Iterables.transform(persons, TO_NAME))
+}
+----
+
+=== Separating API from implementation
+
+[source,groovy]
+----
+dependencies {
+   api project(':model')
+   implementation 'com.google.guava:guava:18.0'
+}
+----
+
+=== Benefit
+
+* No more compile classpath leakage
+* Downstream dependencies not recompiled when internal dependency changes
 
 == Composite builds
 
@@ -225,6 +296,8 @@ gradle -t asciidoctor
 
 == Composite builds demo
 
+== What's next?
+
 == Build cache
 
 * Avoid doing work even after _clean_
@@ -232,16 +305,18 @@ gradle -t asciidoctor
 * Share binaries between projects on a network
 * Backend agnostic
 
-== Task output cache use cases
+== Build cache use cases
 
 * Long compile tasks
 * Bisecting
 * Continuous integration
 * Green Earth ;)
 
-== Task output cache demo
+== What about Android?
 
-With composite builds!
+http://tools.android.com/tech-docs/new-build-system/2-5-alpha-gradle-plugin
+
+image::android-25-preview.png[]
 
 == Performance guide
 
@@ -251,7 +326,7 @@ image::gradle-vs-maven-clean-build.png[]
 
 == Thank you!
 
-* Slides and code : https://github.com/melix/virtualjug-fast-builds
+* Slides and code : https://github.com/melix/paris-android-ug-fast-builds
 * Gradle documentation : http://gradle.org/documentation/
 * Follow me: http://twitter.com/CedricChampeau[@CedricChampeau]
 
