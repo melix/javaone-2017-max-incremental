@@ -294,8 +294,6 @@ dependencies {
 ** Each piece can be versioned independently
 ** Developers can _choose_ what subprojects they care about
 
-== Composite builds demo
-
 == What's next?
 
 == Build cache
