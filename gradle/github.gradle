@@ -1,7 +1,7 @@
 apply plugin: 'org.ajoberstar.github-pages'
 
 githubPages {
-    repoUri = 'git@github.com:melix/paris-android-ug-fast-builds.git'
+    repoUri = 'git@github.com:melix/gradle-summit-2017-max-incremental.git'
     pages {
         from file("$buildDir/asciidoc/revealjs")
     }
