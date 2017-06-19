@@ -129,7 +129,6 @@ public void execute(IncrementalTaskInputs inputs) {
             ...
          }
       });
-      
    }
 }
 ----        
@@ -216,14 +215,17 @@ dependencies {
 
 [source,java]
 ----
-import com.acme.model.Person; // exported dependency
-import com.google.common.collect.ImmutableSet; // internal dependency
-import com.google.common.collect.Iterables; // internal dependency
+// exported dependency
+import com.acme.model.Person; 
+// internal dependencies
+import com.google.common.collect.ImmutableSet; 
+import com.google.common.collect.Iterables;
 
 ...
 
 public Set<String> getNames(Set<Person> persons) {
-   return ImmutableSet.copyOf(Iterables.transform(persons, TO_NAME))
+   return ImmutableSet.copyOf(
+            Iterables.transform(persons, TO_NAME))
 }
 ----
 
@@ -231,7 +233,8 @@ public Set<String> getNames(Set<Person> persons) {
 
 [source,groovy]
 ----
-apply plugin: 'java-library' // This component has an API and an implementation
+// This component has an API and an implementation
+apply plugin: 'java-library' 
 
 dependencies {
    api project(':model')

@@ -22,7 +22,7 @@ body {
 .reveal {
   font-family: "Lato", sans-serif;
   font-weight: 400;
-  font-size: 1.2em;
+  font-size: 1.8em;
   color: #02303A; }
 
 ::selection {
@@ -338,7 +338,7 @@ body {
 }
 
 .reveal pre code {
-   font-size: 1.8em;
+   font-size: 1.6em;
    line-height: 1.2em;
    font-weight: normal;
 }
