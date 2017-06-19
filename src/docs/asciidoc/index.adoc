@@ -11,6 +11,7 @@ ifndef::sourcedir[:sourcedir: ../java]
 :title-slide-background-image: title.jpeg
 :title-slide-transition: zoom
 :title-slide-transition-speed: fast
+:icons: font
  
 == Who am I
 
@@ -245,9 +246,6 @@ dependencies {
 [state=show-dep-graph2]
 === Consequences on cascading
 
-* blue : API dependences
-* grey : implementation dependencies
-
 ++++
 <div id="cy2" class="drawing"></div>
 
@@ -263,7 +261,7 @@ addDependencyGraph(2, function(cy) {
 ++++
 
 [state=show-dep-graph3]
-=== Changing an implementation dependency
+=== Change to impl dependency
 
 ++++
 
@@ -303,7 +301,7 @@ addDependencyGraph(3, function(cy) {
 ++++
 
 [state=show-dep-graph4]
-=== Changing an API dependency
+=== Change to API dependency
 
 ++++
 

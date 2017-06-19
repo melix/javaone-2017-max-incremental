@@ -342,3 +342,8 @@ body {
    line-height: 1.2em;
    font-weight: normal;
 }
+
+.reveal .fa {
+  font-family: 'FontAwesome';
+  font-style: normal;
+}
