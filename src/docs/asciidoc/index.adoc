@@ -1,17 +1,17 @@
-= Extremely fast builds with Gradle 3
+= : Minutes to seconds, maximizing incrementality
 Cédric Champeau (@CedricChampeau), Gradle
-2017-02-28
+2017-06-23
 :revnumber: {project-version}
 :example-caption!:
 ifndef::imagesdir[:imagesdir: images]
 ifndef::sourcedir[:sourcedir: ../java]
-:deckjs_transition: fade
 :navigation:
 :menu:
 :status:
-:adoctor: http://asciidoctor.org/[Asciidoctor]
-:gradle: http://gradle.org[Gradle]
-
+:title-slide-background-image: title.jpeg
+:title-slide-transition: zoom
+:title-slide-transition-speed: fast
+ 
 == Who am I
 
 image::nantes.jpg[background, size=cover]
@@ -26,8 +26,8 @@ image::nantes.jpg[background, size=cover]
 <div class="pictureWrapper">
    <div class="picture"><img src="images/mini-me.png"></div>
 </div>
-++++
 
+++++
 
 [source,groovy]
 ----
@@ -50,110 +50,15 @@ Misc OSS contribs (Gradle plugins, deck2pdf, jlangdetect, ...)'''
 
 == Agenda
 
-* The Gradle Daemon
-* Profiling
 * Incremental builds
+* Compile avoidance
 * Incremental compilation
-* Continuous builds
-* Composite builds
-* Build cache
-
-== Gradle != Android
-
-== What is Gradle?
-
-* A build tool
-* Cloud Services
-
-== The Gradle daemon
-
-* Long-lived background process
-* Listens and executes build actions
-* Faster startup / execution
-* Enabled by default since 3.0
-
-== The Gradle daemon
-
-=== Cold daemon
-
-image::daemon-keynote-cold.gif[]
-
-=== Warm daemon
-
-image::daemon-keynote-warm.gif[]
-
-== Profiling a build
-
-`gradle --profile`
-
-* Generates a report in the build directory
-* Limited insight
-* Not easily shareable
-* But can already give precious information
-
-== Build scans
-
-[cols="50a,50a"]
-|===
-|
-* First member of the Cloud Services family
-* Insights into your build
-* View and share via URL
-* Debug, optimize and refine
-* Analyze _all_ of your builds
-* Available for free 
-|image:build-scans.png[]
-|===
-
-== Build scan demo
-
-https://scans.gradle.com/s/cmihj7rsqszle
-https://scans.gradle.com/s/cxwz7amaxhcdc
-https://scans.gradle.com/s/ly5tnqtuoqlwe
-https://scans.gradle.com/s/7ftlptyifoqna (Android)
-
-== Creating a build scan
-
-=== Apply the build scan plugin
-
-[source,groovy]
-----
-plugins {
-    id 'com.gradle.build-scan' version '1.6'
-}
-
-buildScan {
-    licenseAgreementUrl = 'https://gradle.com/terms-of-service'
-    licenseAgree = 'yes'
-}
-----
-
-=== Run the build
-
-```
-./gradlew --scan build
-```
-
-=== Click on the link
-
-```
-:jrubyPrepareGems
-:asciidoctor UP-TO-DATE
-
-BUILD SUCCESSFUL
-
-Total time: 1.132 secs
-
-Publishing build information...
-https://gradle.com/s/v2f5knnujnsx2
-
-```
 
 == Incremental builds
 
 * Gradle is meant for incremental builds
 * `clean` is a waste of time
-* Prepare your builds for incrementalness
+* So declare your inputs/outputs!
 
 === Example: building a shaded jar
 
@@ -172,22 +77,420 @@ task shadedJar(type: ShadedJar) {
 
 === Declaring inputs
 
-[source,groovy]
+[source,java]
 ----
-@InputFiles
-FileCollection getClasspath() { ... }
+public class ShadedJar extends DefaultTask {
+   ...
+   @InputFiles
+   FileCollection getClasspath() { ... }
 
-@Input
-Map<String, String> getMapping() { ... }
+   @Input
+   Map<String, String> getMapping() { ... }
+}
 ----
 
 === Declaring outputs
 
+[source,java]
+----
+public class ShadedJar extends DefaultTask {
+   ...
+
+   @OutputFile
+   File getJarFile() { ... }
+}
+----
+
+=== Know why your task is out-of-date
+
+image::task-out-of-date.png[height=415]
+
+=== Incremental task inputs
+
+* Know precisely _which_ files have changed
+* Task action can perform the minimal amount of work
+
+== Incremental task inputs
+
+[source,java]
+----
+@TaskAction
+public void execute(IncrementalTaskInputs inputs) {
+   if (!inputs.isIncremental()) {
+      // clean build, for example
+      // ...
+   } else {
+      inputs.outOfDate(change ->
+         if (change.isAdded()) {
+           ...
+         } else if (change.isRemoved()) {
+           ...
+         } else {
+            ...
+         }
+      });
+      
+   }
+}
+----        
+
+== Compile avoidance
+
+=== Compile classpath leakage
+
+[state=show-dep-graph0]
+=== A typical dependency graph
+
+++++
+<div id="cy0" class="drawing"></div>
+
+<script>
+addDependencyGraph(0, function() {});
+</script>
+
+++++
+
+[state=show-dep-graph1]
+=== Cascading recompilation
+
+++++
+<div id="cy1" class="drawing"></div>
+
+<script>
+addDependencyGraph(1, function(cy) {
+   var highlightNextEle = function(elts){     
+       for (i=0; i<elts.length; i++) {
+          elts[i].addClass('highlighted');
+          var incomingEdges = elts[i].incomers('edge');
+          (function(incomingEdges) {
+             setTimeout(function() { 
+                for (j=0; j<incomingEdges.length; j++) {
+                   incomingEdges[j].addClass('highlighted');
+                };
+                highlightNextEle(incomingEdges.sources()); 
+             }, 1000);
+          })(incomingEdges);
+       }
+       
+     
+   };
+
+   // kick off first highlight
+   highlightNextEle(cy.$('#i'));
+});
+</script>
+
+++++
+
+[state=show-dep-graph2]
+== Separating API and implementation
+
+=== Example
+
+[source,java]
+----
+import com.acme.model.Person;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+
+...
+
+public Set<String> getNames(Set<Person> persons) {
+   return ImmutableSet.copyOf(Iterables.transform(persons, TO_NAME))
+}
+----
+
+=== Before Gradle 3.4
+
 [source,groovy]
 ----
-@OutputFile
-File getJarFile() { ... }
+apply plugin: 'java'
+
+dependencies {
+   compile project(':model')
+   compile 'com.google.guava:guava:18.0'
+}
 ----
+
+=== But...
+
+[source,java]
+----
+import com.acme.model.Person; // exported dependency
+import com.google.common.collect.ImmutableSet; // internal dependency
+import com.google.common.collect.Iterables; // internal dependency
+
+...
+
+public Set<String> getNames(Set<Person> persons) {
+   return ImmutableSet.copyOf(Iterables.transform(persons, TO_NAME))
+}
+----
+
+=== Starting from Gradle 3.4
+
+[source,groovy]
+----
+apply plugin: 'java-library' // This component has an API and an implementation
+
+dependencies {
+   api project(':model')
+   implementation 'com.google.guava:guava:18.0'
+}
+----
+
+[state=show-dep-graph2]
+=== Consequences on cascading
+
+* blue : API dependences
+* grey : implementation dependencies
+
+++++
+<div id="cy2" class="drawing"></div>
+
+<script>
+addDependencyGraph(2, function(cy) {
+   var api = cy.filter('edge[kind="api"]');
+   for (i=0; i<api.length; i++) {
+      api[i].addClass('api');
+   }
+});
+</script>
+
+++++
+
+[state=show-dep-graph3]
+=== Changing an implementation dependency
+
+++++
+
+<div id="cy3" class="drawing"></div>
+
+<script>
+addDependencyGraph(3, function(cy) {
+   var api = cy.filter('edge[kind="api"]');
+   for (i=0; i<api.length; i++) {
+      api[i].addClass('api');
+   }
+   var highlightNextEle = function(elts){     
+       for (i=0; i<elts.length; i++) {
+          (function(node) {
+             var incomingEdges = node.incomers('edge');
+             (function(incomingEdges) {
+                setTimeout(function() { 
+                   node.addClass('highlighted');
+                   for (j=0; j<incomingEdges.length; j++) {
+                      incomingEdges[j].addClass('highlighted');
+                      incomingEdges[j].source().addClass('highlighted');
+                   };
+                   //highlightNextEle(incomingEdges.sources()); 
+                }, 1000);
+             })(incomingEdges);
+          })(elts[i]);
+       }
+       
+     
+   };
+
+   // kick off first highlight
+   highlightNextEle(cy.$('#i'));
+});
+</script>
+
+++++
+
+[state=show-dep-graph4]
+=== Changing an API dependency
+
+++++
+
+<div id="cy4" class="drawing"></div>
+
+<script>
+addDependencyGraph(4, function(cy) {
+   var api = cy.filter('edge[kind="api"]');
+   for (i=0; i<api.length; i++) {
+      api[i].addClass('api');
+   }
+   var highlightNextEle = function(elts){     
+       for (i=0; i<elts.length; i++) {
+          (function(node) {
+             var incomingEdges = node.incomers('edge[kind="api"]');
+             (function(incomingEdges) {
+                setTimeout(function() { 
+                   node.addClass('highlighted');
+                   for (j=0; j<incomingEdges.length; j++) {
+                      incomingEdges[j].removeClass('api');
+                      incomingEdges[j].addClass('highlighted');
+                      incomingEdges[j].source().addClass('highlighted');
+                   };
+                   highlightNextEle(incomingEdges.sources()); 
+                }, 1000);
+             })(incomingEdges);
+          })(elts[i]);
+       }
+       
+     
+   };
+
+   // kick off first highlight
+   highlightNextEle(cy.$('#h'));
+});
+</script>
+
+++++
+
+
+== Classpath snapshotting
+
+[%step]
+* Compute a hash of inputs
+* If hash hasn't changed, task is up-to-date
+* Is a compile classpath equivalent to runtime classpath?
+
+=== Compile classpath
+
+What does a *compiler* care about?
+
+[%step]
+* Input: jars, or class directories
+* Jar: class files
+* Class file: both API and implementation
+
+=== Compile classpath
+
+What we provide to the compiler
+
+```
+public class Foo {
+    private int x = 123;
+    
+    public int getX() { return x; }
+    public int getSquaredX() { return x * x; }
+}
+```
+
+=== Compile classpath
+
+What the compiler cares about:
+
+```
+public class Foo {
+    public int getX()
+    public int getSquaredX()
+}
+```
+
+=== Compile classpath
+
+But it could also be
+
+```
+public class Foo {
+    public int getSquaredX()
+    public int getX()
+}
+```
+
+**only public signatures matter**
+
+=== Compile classpath
+
+[%step]
+* Compute a hash of the signature of class : `aedb00fd`
+* Combine hashes of all classes : `e45bdc17`
+* Combine hashes of all input on classpath: `4500fc1`
+* Result: hash of the compile classpath
+* Only consists of what is _relevant_ to the `javac` compiler
+
+=== Runtime classpath
+
+What does the runtime care about?
+
+=== Runtime classpath
+
+What does the runtime care about:
+
+```
+public class Foo {
+    private int x = 123;
+    
+    public int getX() { return x; }
+    public int getSquaredX() { return x * x; }
+}
+```
+
+At runtime, *everything* matters, from classes to resources.
+
+=== Compile vs runtime classpath
+
+In practice:
+
+[source,java]
+----
+@InputFiles
+@CompileClasspath
+FileCollection getCompileClasspath() { ... }
+
+@InputFiles
+@Classpath
+FileCollection getRuntimeClasspath() { ... }
+----
+
+=== Compile avoidance
+
+* Gradle makes the difference
+* Ignores irrelevant (non ABI) changes to compile classpath
+
+[state=show-dep-graph5]
+=== Consequences on cascading recompilations
+
+++++
+
+<div id="cy5" class="drawing"></div>
+
+<script>
+addDependencyGraph(5, function(cy) {
+   var api = cy.filter('edge[kind="api"]');
+   for (i=0; i<api.length; i++) {
+      api[i].addClass('api');
+   }
+   var highlightNextEle = function(elts, depth){     
+       if (depth>=1) { return; }
+       for (i=0; i<elts.length; i++) {
+          (function(node) {
+             var incomingEdges = node.incomers('edge[kind="api"]');
+             (function(incomingEdges) {
+                setTimeout(function() { 
+                   node.addClass('highlighted');
+                   for (j=0; j<incomingEdges.length; j++) {
+                      incomingEdges[j].removeClass('api');
+                      incomingEdges[j].addClass('highlighted');
+                      incomingEdges[j].source().addClass('highlighted');
+                   };
+                   highlightNextEle(incomingEdges.sources(), depth+1); 
+                }, 1000);
+             })(incomingEdges);
+          })(elts[i]);
+       }
+       
+     
+   };
+
+   // kick off first highlight
+   highlightNextEle(cy.$('#h'), 0);
+});
+</script>
+
+++++
+
+=== Icing on the cake
+
+* Upgrade a dependency from `1.0.1` to `1.0.2`
+* If ABI hasn't changed, Gradle will _not_ recompile
+* Even if the name of the jar is different (`mydep-1.0.1.jar` vs `mydep-1.0.2.jar`)
+* Because only _contents_ matter
+
 
 == Incremental compilation
 
@@ -205,129 +508,171 @@ compileJava {
 }
 ```
 
-image::gradle-3.4-perf.png[]
+NOTE: Kotlin plugin implements its own incremental compilation
 
-== Gradle 3.4
-
-https://blog.gradle.org/incremental-compiler-avoidance
-
-== Continuous builds
-
-* Gradle watches for changes in task inputs
-* Re-executes tasks as changes occur
-* Enabled with `-t`
-
-```
-gradle -t asciidoctor
-```
-
-== Compile avoidance
-
-=== Compile classpath vs runtime classpath
-
-* Gradle makes the difference
-* Ignores irrelevant (non ABI) changes to compile classpath
-
-=== Usage
+=== In practice
 
 [source,java]
 ----
-import com.acme.model.Person;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
+import org.apache.commons.math3.complex.Complex;
 
-...
-
-public Set<String> getNames(Set<Foo> persons) {
-   return ImmutableSet.copyOf(Iterables.transform(persons, TO_NAME))
+public class Library {
+    public Complex someLibraryMethod() {
+        return Complex.I;
+    }
 }
 ----
 
-=== Declaring dependencies
+[%step]
+* `Complex` is a dependency of `Library`
+* if `Complex` is changed, we need to recompile `Library`
+* if `ComplexUtils` is changed, no need to recompile
 
-[source,groovy]
-----
-dependencies {
-   compile project(':model')
-   compile 'com.google.guava:guava:18.0'
-}
-----
-
-=== But...
+=== Gotcha
 
 [source,java]
 ----
-import com.acme.model.Person; // exported dependency
-import com.google.common.collect.ImmutableSet; // internal dependency
-import com.google.common.collect.Iterables; // internal dependency
+import org.apache.commons.math3.dfp.Dfp;
 
+public class LibraryUtils {
+   public static int getMaxExp() {
+      return Dfp.MAX_EXP;
+   }
+}
+----
+
+[%step]
+* `Dfp` is a dependency of `LibraryUtils`
+* so if `MAX_EXP` changes, we should recompile `LibraryUtils`, right?
+
+=== Wait a minute...
+
+> `javap -v build/classes/java/main/LibraryUtils.class`
+
+```
 ...
+  public static int getMaxExp();
+    descriptor: ()I
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=1, locals=0, args_size=0
+         0: ldc           #3                  // int 32768
+         2: ireturn
+```
 
-public Set<String> getNames(Set<Foo> persons) {
-   return ImmutableSet.copyOf(Iterables.transform(persons, TO_NAME))
-}
-----
+* reference to `Dfp` is gone!
+* compiler _inlines_ some constants
+* JLS says compiler doesn't have to add the dependent class to constant pool
 
-=== Separating API from implementation
+=== What Gradle does
 
-[source,groovy]
-----
-dependencies {
-   api project(':model')
-   implementation 'com.google.guava:guava:18.0'
-}
-----
+[%step]
+* Analyze all _bytecode_ of all classes
+* Record which constants are used in which file
+* Whenever a producer changes, check if a _constant_ changed
+* If yes, recompile _everything_
 
-=== Benefit
+== Variant aware dependency management
 
-* No more compile classpath leakage
-* Downstream dependencies not recompiled when internal dependency changes
+=== Producer vs consumer
 
-== Composite builds
+[%step]
+* A `consumer` _depends on_ a `producer`
+* There are multiple requirements
+** What is required to compile against a `producer`?
+** What is required at _runtime_ for a specific configuration?
+** What artifacts does the producer offer?
+** Is the `producer` a sub-project or an external component?
 
-* _Compose_ various projects as if there were one
-** Each project can live in its own repository
-** Each project has its own Gradle build
-** Composition unites them through _dependency resolution_
-* _Split_ monolithic projects
-** For large multiproject builds, allows splitting them into several pieces
-** Each piece can be versioned independently
-** Developers can _choose_ what subprojects they care about
+=== What do you need to compile against a component?
 
-== What's next?
+* Class files
+* Can be found in different forms:
+** class directories
+** jars
+** aars, ...
 
-== Build cache
+*Question*: do we need to build a jar of the producer if all we want is to compile against it?
 
-* Avoid doing work even after _clean_
-* Share binaries between projects on a single machine
-* Share binaries between projects on a network
-* Backend agnostic
+=== Discriminate thanks to _usage_
 
-== Build cache use cases
+[quote, Consumer]
+____
+Give me something that I can use to compile
+____
 
-* Long compile tasks
-* Bisecting
-* Continuous integration
-* Green Earth ;)
+=== Discriminate thanks to _usage_
 
-== What about Android?
+[quote, Producer]
+____
+Sure, here's a jar
+____
 
-http://tools.android.com/tech-docs/new-build-system/2-5-alpha-gradle-plugin
+=== Discriminate thanks to _usage_
 
-image::android-25-preview.png[]
+But we can be finer:
 
-== Performance guide
+[quote, Producer]
+____
+Sure, here's a class directory
+____
 
-https://gradle.github.io/performance-guide/
+=== Discriminate thanks to _usage_
 
-image::gradle-vs-maven-clean-build.png[]
+Or smarter:
 
-== Thank you!
-
-* Slides and code : https://github.com/melix/paris-android-ug-fast-builds
-* Gradle documentation : http://gradle.org/documentation/
-* Follow me: http://twitter.com/CedricChampeau[@CedricChampeau]
-
-Learn more at https://gradle.org[www.gradle.org]
+[quote, Producer]
+____
+mmm, all I have is an AAR, but don't worry, I know how to transform it to something you can use for compile
+____
 
 
+=== The Java Library Plugin
+
+* will provide consumers with a _class directory_ for compile
+* will provide consumers with a _jar_ for runtime
+
+As a consequence:
+
+* only `classes` task will be triggerred when compiling
+* `jar` (and therefore `processResources`) only triggerred when needed at runtime
+
+=== Conclusion
+
+Use the Java Library Plugin!
+
+++++
+<div id="chart"></div>
+<script>
+dependencyGraphs.push(function() {
+   var chart = c3.generate({
+       data: {
+           rows: [
+            ['Scenario','Maven 3.3.9','Gradle 3.3','Gradle 3.4'],
+            ['Large project 1 change',20.80,13.10,1.30],
+            ['Medium project 1 change',5.70,1.30,0.26],
+            ['Multi project ABI-breaking change',26.80,15.80,3.30],
+            ['Multi project ABI-compatible change',26.80,16.30,1.40]],
+           type: 'bar',
+           x: 'Scenario',
+           labels: true
+       },
+       axis: {
+           x: {
+               type: 'category'
+           },
+           y: {
+               label: 'seconds'
+           }
+       },
+       legend: {
+          position: 'right'
+       }
+   });
+});
+</script>
+++++
+
+[%notitle]
+== Thanks
+image::outro.jpeg[background, size=cover]

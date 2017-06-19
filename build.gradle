@@ -30,7 +30,7 @@ dependencies {
 }
 
 ext {
-    revealjsVersion = '2.6.2'
+    revealjsVersion = '3.5.0'
     asciidoctorBackendVersion = 'master'
     downloadDir = new File(buildDir, 'download')
     templateDir = new File(downloadDir, 'templates')

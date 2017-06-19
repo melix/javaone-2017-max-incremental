@@ -15,7 +15,7 @@ task export {}
         dependsOn asciidoctor
         main = 'me.champeau.deck2pdf.Main'
         workingDir = file("$buildDir/asciidoc/revealjs")
-        args = ['index.html',"${type}/${project.name}.$type",'--profile=revealjs']
+        args = ['index.html',"${type}/${project.name}.$type",'--profile=revealjs', '--width=1280' ,'--height=720']
         classpath = configurations.pdf
 
         inputs.file("$workingDir/index.html")
