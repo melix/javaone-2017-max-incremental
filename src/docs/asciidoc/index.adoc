@@ -573,6 +573,35 @@ public class LibraryUtils {
 * Whenever a producer changes, check if a _constant_ changed
 * If yes, recompile _everything_
 
+== Annotation processors
+
+[%step]
+* Implementation of the annotation processors matter at compile time
+* Don't add annotation processors to _compile classpath_
+* or we cannot use smart classpath snapshotting
+
+== Annotation processors
+
+Use `annotationProcessorPath`:
+
+[source,groovy]
+----
+configurations {
+    apt
+}
+dependencies {
+    // The dagger compiler and its transitive dependencies will only be found on annotation processing classpath
+    apt 'com.google.dagger:dagger-compiler:2.8'
+
+    // And we still need the Dagger annotations on the compile classpath itself
+    compileOnly 'com.google.dagger:dagger:2.8'
+}
+
+compileJava {
+    options.annotationProcessorPath = configurations.apt
+}
+----
+
 == Variant aware dependency management
 
 === Producer vs consumer
@@ -649,7 +678,7 @@ dependencyGraphs.push(function() {
    var chart = c3.generate({
        data: {
            rows: [
-            ['Scenario','Maven 3.3.9','Gradle 3.3','Gradle 3.4'],
+            ['Scenario','Maven 3.3.9','Gradle 3.3','Gradle 4.0'],
             ['Large project 1 change',20.80,13.10,1.30],
             ['Medium project 1 change',5.70,1.30,0.26],
             ['Multi project ABI-breaking change',26.80,15.80,3.30],
