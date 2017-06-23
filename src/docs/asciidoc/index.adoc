@@ -54,12 +54,26 @@ Misc OSS contribs (Gradle plugins, deck2pdf, jlangdetect, ...)'''
 * Incremental builds
 * Compile avoidance
 * Incremental compilation
+* Variant-aware dependency management
 
+[background-color="#01303a"]
 == Incremental builds
+
+== Why does it matter?
 
 * Gradle is meant for incremental builds
 * `clean` is a waste of time
+* Time is $$$
 * So declare your inputs/outputs!
+
+== The incremental test
+
+[%step]
+* Run a build
+* Run again with no change
+* If a task was re-executed, you got it wrong
+
+== Fixing tasks
 
 === Example: building a shaded jar
 
@@ -111,7 +125,7 @@ image::task-out-of-date.png[height=415]
 * Know precisely _which_ files have changed
 * Task action can perform the minimal amount of work
 
-== Incremental task inputs
+=== Incremental task inputs
 
 [source,java]
 ----
@@ -134,6 +148,7 @@ public void execute(IncrementalTaskInputs inputs) {
 }
 ----        
 
+[background-color="#01303a"]
 == Compile avoidance
 
 === Compile classpath leakage
@@ -341,8 +356,10 @@ addDependencyGraph(4, function(cy) {
 
 ++++
 
+[background-color="#01303a"]
+== Consumers are not equal
 
-== Classpath snapshotting
+=== Classpath snapshotting
 
 [%step]
 * Compute a hash of inputs
@@ -492,8 +509,10 @@ addDependencyGraph(5, function(cy) {
 * Even if the name of the jar is different (`mydep-1.0.1.jar` vs `mydep-1.0.2.jar`)
 * Because only _contents_ matter
 
-
+[background-color="#01303a"]
 == Incremental compilation
+
+== Basics
 
 * Given a set of source files
 * Only compile the files which have changed...
@@ -602,6 +621,7 @@ compileJava {
 }
 ----
 
+[background-color="#01303a"]
 == Variant aware dependency management
 
 === Producer vs consumer
@@ -667,9 +687,10 @@ As a consequence:
 * only `classes` task will be triggerred when compiling
 * `jar` (and therefore `processResources`) only triggerred when needed at runtime
 
-=== Conclusion
+[background-color="#01303a"]
+== Conclusion
 
-Use the Java Library Plugin!
+=== Use the Java Library Plugin!
 
 ++++
 <div id="chart"></div>
@@ -702,6 +723,9 @@ dependencyGraphs.push(function() {
 });
 </script>
 ++++
+
+Slides: https://melix.github.io/gradle-summit-2017-max-incremental
+Discuss: @CedricChampeau
 
 [%notitle]
 == Thanks
