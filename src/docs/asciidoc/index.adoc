@@ -461,7 +461,7 @@ FileCollection getRuntimeClasspath() { ... }
 * Ignores irrelevant (non ABI) changes to compile classpath
 
 [state=show-dep-graph5]
-=== Consequences on cascading recompilations
+=== Effect on recompilations
 
 ++++
 
