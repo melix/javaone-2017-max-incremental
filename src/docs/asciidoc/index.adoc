@@ -64,16 +64,15 @@ Misc OSS contribs (Gradle plugins, deck2pdf, jlangdetect, ...)'''
 * Gradle is meant for incremental builds
 * `clean` is a waste of time
 * Time is $$$
-* So declare your inputs/outputs!
 
-== The incremental test
+== The incrementality test
 
 [%step]
 * Run a build
 * Run again with no change
 * If a task was re-executed, you got it wrong
 
-== Fixing tasks
+== Properly writing tasks
 
 === Example: building a shaded jar
 
@@ -197,7 +196,14 @@ addDependencyGraph(1, function(cy) {
 
 ++++
 
-[state=show-dep-graph2]
+=== Cascading recompilation
+
+But also with side effects:
+
+* compile dependencies _leak_ to the downstream consumers
+* hard to upgrade dependencies without breaking clients
+
+[background-color="#01303a"]
 == Separating API and implementation
 
 === Example
@@ -259,7 +265,7 @@ dependencies {
 ----
 
 [state=show-dep-graph2]
-=== Consequences on cascading
+=== API vs impl graph
 
 ++++
 <div id="cy2" class="drawing"></div>
@@ -359,13 +365,6 @@ addDependencyGraph(4, function(cy) {
 [background-color="#01303a"]
 == Consumers are not equal
 
-=== Classpath snapshotting
-
-[%step]
-* Compute a hash of inputs
-* If hash hasn't changed, task is up-to-date
-* Is a compile classpath equivalent to runtime classpath?
-
 === Compile classpath
 
 What does a *compiler* care about?
@@ -412,7 +411,7 @@ public class Foo {
 
 **only public signatures matter**
 
-=== Compile classpath
+=== Compile classpath snapshotting
 
 [%step]
 * Compute a hash of the signature of class : `aedb00fd`
@@ -457,6 +456,7 @@ FileCollection getRuntimeClasspath() { ... }
 
 === Compile avoidance
 
+* _compile_ and _runtime_ classpath have different _semantics_
 * Gradle makes the difference
 * Ignores irrelevant (non ABI) changes to compile classpath
 
@@ -595,6 +595,7 @@ public class LibraryUtils {
 == Annotation processors
 
 [%step]
+* Disable incremental compilation (working on it!)
 * Implementation of the annotation processors matter at compile time
 * Don't add annotation processors to _compile classpath_
 * or we cannot use smart classpath snapshotting
